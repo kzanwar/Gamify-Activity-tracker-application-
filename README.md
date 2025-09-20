@@ -1,1 +1,2 @@
-# Gamify-Activity-tracker-application-
+# Gamify-Activity-tracker-application- 
+init
