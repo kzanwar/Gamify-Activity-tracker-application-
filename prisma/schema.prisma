@@ -1,0 +1,341 @@
+/**
+ * Prisma Database Schema
+ *
+ * This file defines the complete database schema for the Gamified Activity Tracker.
+ * It uses Prisma ORM to provide type-safe database operations and automatic
+ * schema migrations. The schema implements a gamified habit tracking system
+ * with focus-based point calculations.
+ *
+ * Database Design:
+ * - PostgreSQL for robust data integrity and complex queries
+ * - Foreign key relationships ensuring referential integrity
+ * - Unique constraints preventing data duplication
+ * - Cascading deletes for clean data cleanup
+ * - JSON fields for flexible configuration storage
+ *
+ * Core Entities:
+ * - User: Application users with authentication
+ * - PointCategory: Organizational units for activities (e.g., "Professional", "Health")
+ * - Activity: Configurable activities with point calculations
+ * - LoggedActivity: Records of completed activities with earned points
+ * - Task: Daily/weekly tasks with completion tracking
+ * - LoggedTask: Records of completed tasks
+ * - Benchmark: Achievement levels within categories
+ * - Badge: Gamification achievements
+ * - UserBadge: User's earned achievements
+ * - DailyLog: Daily activity summaries and insights
+ * - Insight: Reflections and learnings from activities
+ * - EndOfDayQuestion/Insight: Custom reflection questions and answers
+ *
+ * Key Design Principles:
+ * - User isolation: All data scoped to individual users
+ * - Flexible scoring: Support for multiple point calculation methods
+ * - Audit trail: Complete history of all user actions
+ * - Performance: Optimized queries with proper indexing
+ * - Extensibility: JSON fields for future feature additions
+ */
+
+// Generate Prisma Client for type-safe database operations
+generator client {
+  provider = "prisma-client-js"
+}
+
+// PostgreSQL database connection
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+
+  // Gamification related
+  pointCategories  PointCategory[]
+  activities       Activity[]
+  tasks            Task[]
+  dailyLogs        DailyLog[]
+  badges           UserBadge[]
+  insights         Insight[]
+  endOfDayInsights EndOfDayInsight[]
+  LoggedActivity   LoggedActivity[]
+  LoggedTask       LoggedTask[]
+  EndOfDayQuestion EndOfDayQuestion[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Point Categories (Professional, Health, Personal, etc.)
+model PointCategory {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  color       String   @default("#3b82f6")
+  createdAt   DateTime @default(now())
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  benchmarks Benchmark[]
+  activities Activity[]
+  Task       Task[]
+
+  @@unique([userId, name])
+}
+
+// Benchmarks for point categories
+model Benchmark {
+  id              String   @id @default(cuid())
+  pointCategoryId String
+  name            String
+  pointsRequired  Int
+  description     String?
+  createdAt       DateTime @default(now())
+
+  pointCategory PointCategory @relation(fields: [pointCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([pointCategoryId, name])
+}
+
+// Activities that earn points
+model Activity {
+  id                  String     @id @default(cuid())
+  userId              String
+  pointCategoryId     String
+  name                String
+  description         String?
+  type                String     @default("fixed") // "fixed" or "time_based"
+  points              Int        @default(0)
+  focusScoringType    String     @default("multiplier") // "multiplier" or "fixed_points"
+  focusLevels         Json?      // { low: number, medium: number, good: number, zen: number } - either multipliers or fixed points based on focusScoringType
+  createdAt           DateTime   @default(now())
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pointCategory    PointCategory    @relation(fields: [pointCategoryId], references: [id], onDelete: Cascade)
+  loggedActivities LoggedActivity[]
+  Insight          Insight[]
+
+  @@unique([userId, name])
+}
+
+// Tasks (daily, time-based, adhoc)
+enum TaskType {
+  DAILY // Repeats every day, earns points when completed
+  TIME_BASED // Earns points based on time spent and intensity
+  ADHOC // One-time tasks
+}
+
+enum TaskFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model Task {
+  id              String        @id @default(cuid())
+  userId          String
+  pointCategoryId String
+  name            String
+  description     String?
+  type            TaskType
+  frequency       TaskFrequency @default(DAILY)
+  basePoints      Int           @default(0)
+
+  // For time-based tasks
+  intensityLevels IntensityLevel[]
+
+  // For daily tasks
+  isCompleted     Boolean   @default(false)
+  lastCompletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pointCategory PointCategory @relation(fields: [pointCategoryId], references: [id], onDelete: Cascade)
+  loggedTasks   LoggedTask[]
+  Insight       Insight[]
+}
+
+// Intensity levels for time-based tasks
+model IntensityLevel {
+  id          String  @id @default(cuid())
+  taskId      String
+  name        String // e.g., "Low", "Medium", "High"
+  multiplier  Float   @default(1.0) // Points multiplier
+  description String?
+
+  task        Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  loggedTasks LoggedTask[]
+
+  @@unique([taskId, name])
+}
+
+// Logged activities and tasks for tracking
+model LoggedActivity {
+  id           String    @id @default(cuid())
+  userId       String
+  activityId   String
+  date         DateTime  @db.Date
+  startTime    DateTime?
+  endTime      DateTime?
+  focusLevel   String? // "low", "medium", "good", "zen"
+  notes        String?
+  pointsEarned Int       @default(0)
+  createdAt    DateTime  @default(now())
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activity   Activity  @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  DailyLog   DailyLog? @relation(fields: [dailyLogId], references: [id])
+  dailyLogId String?
+}
+
+model LoggedTask {
+  id               String    @id @default(cuid())
+  userId           String
+  taskId           String
+  date             DateTime  @db.Date
+  startTime        DateTime?
+  endTime          DateTime?
+  durationMinutes  Int? // For time-based tasks
+  intensityLevelId String? // For time-based tasks
+  notes            String?
+  pointsEarned     Int       @default(0)
+  createdAt        DateTime  @default(now())
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task           Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  intensityLevel IntensityLevel? @relation(fields: [intensityLevelId], references: [id])
+  DailyLog       DailyLog?       @relation(fields: [dailyLogId], references: [id])
+  dailyLogId     String?
+}
+
+// Daily logs and insights
+model DailyLog {
+  id           String   @id @default(cuid())
+  userId       String
+  date         DateTime @db.Date
+  wakeUpTime   String?
+  workFromHome Boolean?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loggedActivities LoggedActivity[]
+  loggedTasks      LoggedTask[]
+  insights         Insight[]
+
+  @@unique([userId, date])
+}
+
+// Activity insights
+model Insight {
+  id         String   @id @default(cuid())
+  userId     String
+  dailyLogId String
+  activityId String?
+  taskId     String?
+  type       String // "activity" or "task"
+  content    String // What went well, what to improve, etc.
+  createdAt  DateTime @default(now())
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dailyLog DailyLog  @relation(fields: [dailyLogId], references: [id], onDelete: Cascade)
+  activity Activity? @relation(fields: [activityId], references: [id])
+  task     Task?     @relation(fields: [taskId], references: [id])
+}
+
+// End of day insights based on questions
+model EndOfDayQuestion {
+  id        String   @id @default(cuid())
+  userId    String
+  question  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  insights EndOfDayInsight[]
+
+  @@unique([userId, question])
+}
+
+model EndOfDayInsight {
+  id         String   @id @default(cuid())
+  userId     String
+  date       DateTime @db.Date
+  questionId String
+  answer     String
+  createdAt  DateTime @default(now())
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question EndOfDayQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId, date])
+}
+
+// Badge system
+model Badge {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  description    String
+  icon           String
+  pointsRequired Int
+  category       String // "total_points", "streak", "category_specific", etc.
+  createdAt      DateTime @default(now())
+
+  userBadges UserBadge[]
+}
+
+model UserBadge {
+  id       String   @id @default(cuid())
+  userId   String
+  badgeId  String
+  earnedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+}

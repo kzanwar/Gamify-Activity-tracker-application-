@@ -1,0 +1,60 @@
+---
+description: >
+  Project-wide engineering rules and conventions. These are must do rules, that must be followed. 
+
+  1. Before coding, write or edit SPEC.md for the feature 
+     (What/Why/Scope/Out-of-scope/Acceptance tests/Trade-offs).
+
+  2. Get green CI before review.
+
+  3. Use TypeScript in strict mode; no `any` unless justified in SPEC.md.
+
+  4. Per function: ≤ 60 LOC, cyclomatic ≤ 10, nesting ≤ 3, params ≤ 4.
+     Follow single responsibility principle.
+
+  5. Public functions/classes must include a docstring with examples and error cases.
+
+  6. Follow a layered architecture: 
+     domain (pure) → app/use-cases (orchestration) → adapters (web, DB, queues, external APIs).
+
+  7. No framework/DB code inside domain.
+
+  8. In Next.js, do not leak server-only code/secrets into client bundles; 
+     keep env access at server adapters.
+
+  9. Changes to API schemas, events, or DB require updated contracts, migrations, tests,
+     and CHANGELOG in the same PR.
+
+  10. DB changes follow expand → backfill → contract with rollback steps.
+
+  11. Security & privacy: Validate all external inputs at boundaries; encode outputs;
+      handle authn/authz at the server.
+
+  12. No PII in logs. Secrets only via env/secret manager; never in code/fixtures.
+
+  13. Instrument new paths with structured logs (traceId) and key metrics.
+
+  14. Respect performance budgets (bundle size, p95 latency, LCP).
+      If exceeded, stop and address in the PR.
+
+  15. Add/modify tests with every change: unit (majority), integration at real boundaries,
+      minimal E2E on critical flows.
+
+  16. Tests are deterministic and fast; no external network without mocks.
+
+  17. If behavior visible to users or contracts change, update README/CONTEXT.md/ADRs 
+      in the same PR, or explain why not in SPEC.md.
+
+  18. Technology/library changes require an ADR in the PR with migration steps,
+      risk, and rollback. Default to existing conventions.
+
+  19. Add comments where necessary, especially at function/class interfaces
+      to explain intent.
+
+  20. Whenever functions/classes are modified, ensure comments are updated
+      and remain relevant.
+
+globs:
+  - "**/*"
+alwaysApply: true
+---

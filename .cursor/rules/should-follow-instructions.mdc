@@ -1,0 +1,46 @@
+---
+description: >
+  Project guidelines (should-do practices). These supplement the must-do rules. These should be followed unless the task demands something else. 
+
+  General:
+  - For each module, add a README file to explain what the module is supposed to do.
+
+  A) Design & reuse
+  1. Prefer reusable, self-contained modules/components with clear contracts.
+  2. Keep dependencies minimal; prefer standard library or first-party utilities.
+
+  B) Next.js rendering & caching
+  3. Choose SSR/ISR/SSG/CSR per page; document rationale and caching (revalidate/headers).
+  4. Be explicit when using Edge vs Node runtime; set timeouts and payload limits.
+
+  C) Data layer
+  5. Pick one data-access approach (ORM/query builder).
+     Apply transactions, connection pooling, and repository-like boundaries where it aids testability.
+
+  D) Observability
+  - Prefer OpenTelemetry-compatible traces and structured logs.
+  - Emit metrics on hot paths (throughput, errors, duration).
+
+  E) Frontend quality
+  - Favor accessibility (WCAG), a design-token-based system, code-splitting, and image optimization.
+  - Keep prop surfaces small and components pure where possible.
+
+  F) Ops & cost
+  - Prefer idempotent jobs, backpressure on queues, and caching with explicit TTLs.
+  - Track cost/perf regressions; avoid needless background churn.
+
+  WORKFLOW
+  - Read CONTEXT.md and recent ADRs; align with conventions.
+  - Author SPEC.md with acceptance tests; propose contracts if needed.
+  - Implement domain → app → adapters (in that order).
+  - Add/update tests; ensure deterministic and focused coverage.
+  - Run quality gates (lint, typecheck, tests, size, vuln, schema, budgets); fix failures.
+  - Prepare PR using the template; include risk/rollback and links to updated docs/contracts.
+
+  Checks for generated code:
+  - Paste command outputs for: typecheck, unit/integration tests, size/bundle check, and lint summary.
+  - If exceeding a budget, either fix or justify in SPEC.md with a follow-up issue.
+globs:
+  - "**/*"
+alwaysApply: true
+---
